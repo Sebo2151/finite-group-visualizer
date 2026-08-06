@@ -1,0 +1,1686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="author" content="Sebastian Bozlee" />
+  <meta name="description" content="Interactive visualization of all five groups of order 8: left and right multiplication, net transformations, and Cayley graphs." />
+  <title>Groups of Order 8 Visualizer</title>
+  <style>
+    :root {
+      --page-bg: #f5f7fb;
+      --panel-bg: rgba(255, 255, 255, 0.93);
+      --ink: #172033;
+      --muted: #5b6478;
+      --border: #d9dfeb;
+      --left: #315fbd;
+      --left-soft: #eaf0ff;
+      --right: #9b4d2a;
+      --right-soft: #fff0e9;
+      --dot-fill: #ffffff;
+      --dot-stroke: #172033;
+      --shadow: 0 18px 50px rgba(31, 42, 68, 0.12);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top left, #ffffff 0, transparent 34%),
+        linear-gradient(145deg, #eef2f9, var(--page-bg));
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    .app {
+      width: min(1520px, 100%);
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 18px;
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(1.65rem, 3vw, 2.45rem);
+      letter-spacing: -0.03em;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .group-picker {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-top: 14px;
+    }
+
+    .group-picker label {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 760;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    select {
+      min-width: 250px;
+      border: 1px solid #c7cedb;
+      border-radius: 11px;
+      background: #fff;
+      color: var(--ink);
+      padding: 9px 34px 9px 12px;
+      font: inherit;
+      font-weight: 650;
+    }
+
+    select:focus-visible,
+    input:focus-visible,
+    button:focus-visible {
+      outline: 3px solid rgba(49, 95, 189, 0.24);
+      outline-offset: 2px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(145px, 185px) minmax(470px, 1fr) minmax(145px, 185px);
+      gap: 18px;
+      align-items: stretch;
+      transition: grid-template-columns 180ms ease;
+    }
+
+    .workspace.cayley-open {
+      grid-template-columns:
+        minmax(140px, 175px)
+        minmax(460px, 1fr)
+        minmax(140px, 175px)
+        minmax(200px, 240px);
+    }
+
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid rgba(217, 223, 235, 0.92);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .controls {
+      padding: 18px 14px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .controls h2 {
+      margin: 0 0 14px;
+      font-size: 0.95rem;
+      text-align: center;
+      letter-spacing: 0.02em;
+    }
+
+    .button-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      background: #fff;
+      color: var(--ink);
+      min-height: 42px;
+      padding: 8px 12px;
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+      transition: transform 120ms ease, border-color 120ms ease,
+        box-shadow 120ms ease, background 120ms ease;
+    }
+
+    button:hover,
+    button:focus-visible { transform: translateY(-1px); }
+
+    .left-controls button:hover,
+    .left-controls button:focus-visible {
+      border-color: var(--left);
+      background: var(--left-soft);
+      box-shadow: 0 6px 18px rgba(49, 95, 189, 0.16);
+    }
+
+    .right-controls button:hover,
+    .right-controls button:focus-visible {
+      border-color: var(--right);
+      background: var(--right-soft);
+      box-shadow: 0 6px 18px rgba(155, 77, 42, 0.16);
+    }
+
+    .visual-panel {
+      padding: 14px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .readout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 14px;
+      align-items: center;
+      min-height: 78px;
+      padding: 8px 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .transformation-label,
+    .status-label {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 750;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    #transformation {
+      min-height: 34px;
+      font-family: "STIX Two Math", "Cambria Math", Georgia, serif;
+      font-size: clamp(1.35rem, 2.8vw, 2rem);
+      line-height: 1.15;
+      white-space: nowrap;
+    }
+
+    #status {
+      color: var(--ink);
+      font-size: 0.9rem;
+      font-weight: 620;
+      text-align: right;
+      max-width: 260px;
+    }
+
+    .readout-actions {
+      display: grid;
+      gap: 8px;
+      justify-items: stretch;
+    }
+
+    #reset-button {
+      min-width: 102px;
+      border-color: #c7cedb;
+      background: #f8fafc;
+    }
+
+    #reset-button:hover,
+    #reset-button:focus-visible {
+      border-color: #3d4658;
+      background: #eef1f5;
+      box-shadow: 0 6px 18px rgba(23, 32, 51, 0.12);
+    }
+
+    .cayley-master-toggle {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 30px;
+      padding: 0 3px;
+      font-size: 0.78rem;
+      font-weight: 680;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .cayley-master-toggle input,
+    .radio-row input {
+      width: 17px;
+      height: 17px;
+      margin: 0;
+      accent-color: var(--left);
+    }
+
+    .svg-wrap {
+      position: relative;
+      flex: 1;
+      min-height: 470px;
+      overflow: hidden;
+    }
+
+    svg#visualization {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 470px;
+    }
+
+    .dot {
+      fill: var(--dot-fill);
+      stroke: var(--dot-stroke);
+      stroke-width: 3;
+      filter: url(#dotShadow);
+    }
+
+    .dot-label {
+      fill: var(--ink);
+      font-family: "STIX Two Math", "Cambria Math", Georgia, serif;
+      font-size: 22px;
+      font-weight: 650;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .preview-arrow,
+    .preview-loop {
+      fill: none;
+      stroke-width: 3.2;
+      stroke-linecap: round;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .cayley-arrow,
+    .cayley-loop {
+      fill: none;
+      stroke-width: 2.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.82;
+      pointer-events: none;
+    }
+
+    .legend {
+      padding: 10px 12px 4px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-align: center;
+    }
+
+    .legend strong { color: var(--ink); }
+
+    .legend-note {
+      display: block;
+      margin-top: 3px;
+      font-size: 0.76rem;
+      opacity: 0.9;
+    }
+
+    .cayley-controls {
+      display: none;
+      gap: 14px;
+    }
+
+    .workspace.cayley-open .cayley-controls { display: flex; }
+
+    .cayley-controls h2 { margin-bottom: 2px; }
+
+    .cayley-section {
+      display: grid;
+      gap: 8px;
+    }
+
+    .cayley-section-title {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .side-options {
+      display: grid;
+      gap: 6px;
+      border: 0;
+      padding: 0;
+      margin: 0;
+    }
+
+    .side-options legend {
+      width: 100%;
+      margin-bottom: 7px;
+    }
+
+    .radio-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 30px;
+      font-size: 0.86rem;
+      font-weight: 620;
+      cursor: pointer;
+    }
+
+    .radio-formula {
+      font-family: "STIX Two Math", "Cambria Math", Georgia, serif;
+      font-size: 1.05rem;
+    }
+
+    .radio-side {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 650;
+    }
+
+    .generator-button-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .generator-toggle {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 39px;
+      padding: 7px 10px;
+    }
+
+    .generator-toggle:hover,
+    .generator-toggle:focus-visible {
+      border-color: var(--generator-color);
+      box-shadow: 0 5px 15px color-mix(in srgb, var(--generator-color) 20%, transparent);
+    }
+
+    .generator-toggle[aria-pressed="true"] {
+      border-color: var(--generator-color);
+      background: color-mix(in srgb, var(--generator-color) 13%, white);
+      box-shadow: inset 4px 0 0 var(--generator-color);
+    }
+
+    .generator-swatch {
+      width: 34px;
+      height: 10px;
+      flex: 0 0 auto;
+      opacity: 0.4;
+    }
+
+    .generator-toggle[aria-pressed="true"] .generator-swatch { opacity: 1; }
+
+    .cayley-helper {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.76rem;
+      line-height: 1.35;
+    }
+
+    .site-footer {
+      margin: 22px auto 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.5;
+      text-align: center;
+    }
+
+    .site-footer p { margin: 3px 0; }
+
+    .site-footer a { color: inherit; }
+
+    sup {
+      font-size: 0.68em;
+      vertical-align: 0.46em;
+      line-height: 0;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+
+      button:hover,
+      button:focus-visible { transform: none; }
+    }
+
+    @media (max-width: 1080px) {
+      body { padding: 14px; }
+
+      .workspace,
+      .workspace.cayley-open {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .visual-panel {
+        grid-column: 1 / -1;
+        grid-row: 1;
+      }
+
+      .workspace.cayley-open .cayley-controls {
+        grid-column: 1 / -1;
+        grid-row: 2;
+      }
+
+      .left-controls {
+        grid-column: 1;
+        grid-row: 2;
+      }
+
+      .right-controls {
+        grid-column: 2;
+        grid-row: 2;
+      }
+
+      .workspace.cayley-open .left-controls,
+      .workspace.cayley-open .right-controls { grid-row: 3; }
+
+      .controls { padding: 14px; }
+
+      .button-list,
+      .generator-button-list {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .side-options { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 700px) {
+      .workspace,
+      .workspace.cayley-open { grid-template-columns: 1fr; }
+
+      .visual-panel,
+      .controls { grid-column: 1; }
+
+      .left-controls { grid-row: 2; }
+      .right-controls { grid-row: 3; }
+
+      .workspace.cayley-open .cayley-controls { grid-row: 2; }
+      .workspace.cayley-open .left-controls { grid-row: 3; }
+      .workspace.cayley-open .right-controls { grid-row: 4; }
+
+      .readout { grid-template-columns: 1fr; }
+      #status { text-align: left; max-width: none; }
+      .readout-actions { grid-template-columns: auto auto; justify-content: start; align-items: center; }
+      .button-list,
+      .generator-button-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .svg-wrap,
+      svg#visualization { min-height: 400px; }
+      select { min-width: min(280px, 90vw); }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1 id="page-title">The dihedral group D<sub>8</sub></h1>
+      <p class="subtitle">Hover to preview a permutation; click to queue a multiplication.</p>
+      <div class="group-picker">
+        <label for="group-select">Group of order 8</label>
+        <select id="group-select">
+          <option value="C8">C₈ — cyclic group</option>
+          <option value="C4xC2">C₄ × C₂</option>
+          <option value="C2xC2xC2">C₂ × C₂ × C₂</option>
+          <option value="D8" selected>D₈ — dihedral group</option>
+          <option value="Q8">Q₈ — quaternion group</option>
+        </select>
+      </div>
+    </header>
+
+    <section id="workspace" class="workspace" aria-label="Group multiplication visualizer">
+      <aside class="panel controls left-controls">
+        <h2>Left multiply by</h2>
+        <div id="left-buttons" class="button-list"></div>
+      </aside>
+
+      <section class="panel visual-panel">
+        <div class="readout">
+          <div>
+            <span class="transformation-label">Net transformation</span>
+            <div id="transformation" aria-live="polite">x &mapsto; x</div>
+          </div>
+          <div>
+            <span class="status-label">Status</span>
+            <div id="status" aria-live="polite">Ready</div>
+          </div>
+          <div class="readout-actions">
+            <button id="reset-button" type="button">Reset action</button>
+            <label class="cayley-master-toggle" for="cayley-visible">
+              <input id="cayley-visible" type="checkbox" />
+              <span>Show Cayley graph</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="svg-wrap">
+          <svg id="visualization" viewBox="0 0 720 500" role="img"
+            aria-label="Eight group elements arranged at the projected vertices of a cube">
+            <defs id="svg-defs">
+              <filter id="dotShadow" x="-40%" y="-40%" width="180%" height="180%">
+                <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#1d2939" flood-opacity="0.18" />
+              </filter>
+              <marker id="arrowhead-left" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#315fbd" />
+              </marker>
+              <marker id="arrowhead-right" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#9b4d2a" />
+              </marker>
+            </defs>
+
+            <g id="cayley-layer" aria-hidden="true"></g>
+            <g id="preview-layer" aria-hidden="true"></g>
+            <g id="dot-layer"></g>
+          </svg>
+        </div>
+
+        <div id="legend" class="legend"></div>
+      </section>
+
+      <aside class="panel controls right-controls">
+        <h2>Right multiply by</h2>
+        <div id="right-buttons" class="button-list"></div>
+      </aside>
+
+      <aside id="cayley-controls" class="panel controls cayley-controls">
+        <h2>Cayley graph</h2>
+        <fieldset class="side-options">
+          <legend class="cayley-section-title">Arrows show</legend>
+          <label class="radio-row">
+            <input type="radio" name="cayley-side" value="right" checked />
+            <span class="radio-formula">x &mapsto; xg</span>
+            <span class="radio-side">right</span>
+          </label>
+          <label class="radio-row">
+            <input type="radio" name="cayley-side" value="left" />
+            <span class="radio-formula">x &mapsto; gx</span>
+            <span class="radio-side">left</span>
+          </label>
+        </fieldset>
+        <section class="cayley-section">
+          <p class="cayley-section-title">Displayed elements <span aria-hidden="true">g</span></p>
+          <div id="generator-buttons" class="generator-button-list"></div>
+        </section>
+        <p id="cayley-summary" class="cayley-helper">No elements selected.</p>
+        <p class="cayley-helper">The selected elements need not generate the whole group.</p>
+      </aside>
+    </section>
+
+    <footer class="site-footer">
+      <p>Created by Sebastian Bozlee, Wake Forest University — <a href="mailto:bozlees@wfu.edu">bozlees@wfu.edu</a></p>
+      <p>Developed in collaboration with ChatGPT and Claude. Released under the <a href="LICENSE">MIT License</a>.</p>
+    </footer>
+  </main>
+
+  <script>
+    "use strict";
+
+    /* core:start — pure, DOM-free logic. The test suite extracts everything
+       between these markers and runs it in Node, so nothing in this region may
+       touch `document`, `window`, or any other browser global. */
+
+    const ANIMATION_DURATION_MS = 760;
+    const DOT_RADIUS = 31;
+    const START_ARROW_CLEARANCE = DOT_RADIUS + 6;
+    const END_ARROW_CLEARANCE = DOT_RADIUS + 12;
+    const CATMULL_ROM_TENSION = 1;
+    const ARROW_BEND_MIN = 18;
+    const ARROW_BEND_MAX = 42;
+    const ARROW_BEND_RATIO = 0.13;
+    const OUTWARD_SOFTENING = 8;
+    const LOOP_SPREAD = 13;
+    const LOOP_REACH = 47;
+    const LOOP_FLARE = 24;
+
+    const VIEW_WIDTH = 720;
+    const VIEW_HEIGHT = 500;
+
+    // Slots 0-3 are the front face clockwise from its upper left corner, and
+    // slots 4-7 the matching back corners. Both faces are squares of the same
+    // size, joined by one shared depth offset, so the four-cycles round a face
+    // — and the motion along them — come out circular rather than squashed.
+    // Sized as large as the canvas allows once the four-cycle animation paths,
+    // which bow an eighth of a side outside each face, are accounted for.
+    const CUBE_SIDE = 242;
+    // Foreshortened, but not by much: a depth of 1/(sin θ + cos θ) ≈ 0.62 of
+    // the side would drop the back lower left corner exactly onto the front
+    // face's diagonal, so this stays clear of that while keeping the shortest
+    // edge long enough to carry a readable arrow.
+    const CUBE_DEPTH = 148;
+    // Tilting the depth off the diagonal keeps front-lower-left, back-lower-
+    // left, front-upper-right and back-upper-right off a single straight line,
+    // which is what 45° would give.
+    const CUBE_TILT_DEGREES = 26;
+    const CUBE_TILT_RADIANS = CUBE_TILT_DEGREES * Math.PI / 180;
+    const cubeDepthOffset = {
+      x: CUBE_DEPTH * Math.sin(CUBE_TILT_RADIANS),
+      y: -CUBE_DEPTH * Math.cos(CUBE_TILT_RADIANS)
+    };
+    const cubeFrontOrigin = {
+      x: (VIEW_WIDTH - (CUBE_SIDE + cubeDepthOffset.x)) / 2,
+      y: (VIEW_HEIGHT - CUBE_SIDE - cubeDepthOffset.y) / 2
+    };
+    const cubeFrontCorners = [
+      { x: 0, y: 0 },
+      { x: CUBE_SIDE, y: 0 },
+      { x: CUBE_SIDE, y: CUBE_SIDE },
+      { x: 0, y: CUBE_SIDE }
+    ];
+    const cubeSlotPositions = [
+      ...cubeFrontCorners.map((corner) => ({
+        x: cubeFrontOrigin.x + corner.x,
+        y: cubeFrontOrigin.y + corner.y
+      })),
+      ...cubeFrontCorners.map((corner) => ({
+        x: cubeFrontOrigin.x + corner.x + cubeDepthOffset.x,
+        y: cubeFrontOrigin.y + corner.y + cubeDepthOffset.y
+      }))
+    ];
+    const cubeCenter = {
+      x: cubeFrontOrigin.x + (CUBE_SIDE + cubeDepthOffset.x) / 2,
+      y: cubeFrontOrigin.y + (CUBE_SIDE + cubeDepthOffset.y) / 2
+    };
+
+    const octagonCenter = { x: VIEW_WIDTH / 2, y: VIEW_HEIGHT / 2 };
+    const octagonRadius = 175;
+    const octagonSlotPositions = Array.from({ length: 8 }, (_, index) => {
+      const angle = -Math.PI / 2 + index * Math.PI / 4;
+      return {
+        x: octagonCenter.x + octagonRadius * Math.cos(angle),
+        y: octagonCenter.y + octagonRadius * Math.sin(angle)
+      };
+    });
+
+    // The standard picture of Q8: ±1 on a short vertical axis, ringed by a
+    // regular hexagon carrying ±i, ±j and ±k with each element opposite its
+    // negative. Every ⟨g⟩ and every coset of one then closes up as a convex
+    // quadrilateral, which the cube layout could not manage for Q8.
+    const quaternionCenter = { x: VIEW_WIDTH / 2, y: VIEW_HEIGHT / 2 };
+    const QUATERNION_RING_RADIUS = 200;
+    const QUATERNION_POLE_OFFSET = 71;
+    function quaternionRingPoint(degrees) {
+      const angle = degrees * Math.PI / 180;
+      return {
+        x: quaternionCenter.x + QUATERNION_RING_RADIUS * Math.cos(angle),
+        y: quaternionCenter.y - QUATERNION_RING_RADIUS * Math.sin(angle)
+      };
+    }
+    const quaternionSlotPositions = [
+      { x: quaternionCenter.x, y: quaternionCenter.y - QUATERNION_POLE_OFFSET },
+      { x: quaternionCenter.x, y: quaternionCenter.y + QUATERNION_POLE_OFFSET },
+      quaternionRingPoint(180),
+      quaternionRingPoint(0),
+      quaternionRingPoint(120),
+      quaternionRingPoint(300),
+      quaternionRingPoint(60),
+      quaternionRingPoint(240)
+    ];
+
+    // Every colour clears 4.5:1 against white, so the arrows stay legible at
+    // the 0.82 stroke opacity used in the stylesheet.
+    const cayleyColors = [
+      "#1d4ed8", "#b91c1c", "#047857", "#7e22ce",
+      "#c2410c", "#0e7490", "#9f1239", "#4d7c0f"
+    ];
+
+    // Paired with the colours so the generators stay distinguishable without
+    // relying on hue alone. An empty string means a solid stroke.
+    const cayleyDashes = [
+      "", "10 6", "2 6", "16 5 2 5",
+      "6 5", "1 5", "14 4 2 4 2 4", "22 7"
+    ];
+
+    function mod(value, modulus) {
+      return ((value % modulus) + modulus) % modulus;
+    }
+
+    function powerLabel(base, exponent, suffix = "") {
+      if (exponent === 0) return suffix || "e";
+      if (exponent === 1) return `${base}${suffix}`;
+      return `${base}<sup>${exponent}</sup>${suffix}`;
+    }
+
+    function powerPlain(base, exponent, suffix = "") {
+      if (exponent === 0) return suffix || "e";
+      if (exponent === 1) return `${base}${suffix}`;
+      return `${base}^${exponent}${suffix}`;
+    }
+
+    function powerSvg(base, exponent, suffix = "") {
+      if (exponent === 0) return [{ text: suffix || "e" }];
+      const parts = [{ text: base }];
+      if (exponent > 1) parts.push({ text: String(exponent), superscript: true });
+      if (suffix) parts.push({ text: suffix });
+      return parts;
+    }
+
+    function makeElement(id, html, plain, svgParts, data) {
+      return { id, html, plain, svgParts, data };
+    }
+
+    function buildGroups() {
+      const groups = {};
+
+      {
+        const elements = Array.from({ length: 8 }, (_, n) => makeElement(
+          n === 0 ? "e" : `a${n}`,
+          n === 0 ? "e" : powerLabel("a", n),
+          n === 0 ? "e" : powerPlain("a", n),
+          n === 0 ? [{ text: "e" }] : powerSvg("a", n),
+          n
+        ));
+        const byN = new Map(elements.map((element) => [element.data, element.id]));
+        groups.C8 = {
+          key: "C8",
+          titleHTML: "The cyclic group C<sub>8</sub>",
+          titlePlain: "The cyclic group C8",
+          elements,
+          identityId: "e",
+          slotOrder: ["e", "a1", "a2", "a3", "a4", "a5", "a6", "a7"],
+          slotPositions: octagonSlotPositions,
+          visualCenter: octagonCenter,
+          layoutKind: "octagon",
+          layoutDescription: "around a regular octagon",
+          multiply: (leftId, rightId) => {
+            const left = elements.find((element) => element.id === leftId).data;
+            const right = elements.find((element) => element.id === rightId).data;
+            return byN.get(mod(left + right, 8));
+          },
+          defaultGenerators: ["a1"],
+          legendHTML: "Presentation: <strong>⟨a ∣ a<sup>8</sup> = e⟩</strong>"
+        };
+      }
+
+      {
+        const data = [
+          ["e", 0, 0], ["a", 1, 0], ["a2", 2, 0], ["a3", 3, 0],
+          ["b", 0, 1], ["ab", 1, 1], ["a2b", 2, 1], ["a3b", 3, 1]
+        ];
+        const elements = data.map(([id, i, j]) => makeElement(
+          id,
+          i === 0 ? (j ? "b" : "e") : powerLabel("a", i, j ? "b" : ""),
+          i === 0 ? (j ? "b" : "e") : powerPlain("a", i, j ? "b" : ""),
+          i === 0 ? [{ text: j ? "b" : "e" }] : powerSvg("a", i, j ? "b" : ""),
+          { i, j }
+        ));
+        const key = (i, j) => `${mod(i, 4)},${mod(j, 2)}`;
+        const byPair = new Map(elements.map((element) => [key(element.data.i, element.data.j), element.id]));
+        const byId = new Map(elements.map((element) => [element.id, element]));
+        groups.C4xC2 = {
+          key: "C4xC2",
+          titleHTML: "The group C<sub>4</sub> × C<sub>2</sub>",
+          titlePlain: "The group C4 × C2",
+          elements,
+          identityId: "e",
+          slotOrder: ["e", "a", "a2", "a3", "b", "ab", "a2b", "a3b"],
+          slotPositions: cubeSlotPositions,
+          visualCenter: cubeCenter,
+          layoutKind: "cube",
+          layoutDescription: "at the projected vertices of a cube",
+          multiply: (leftId, rightId) => {
+            const left = byId.get(leftId).data;
+            const right = byId.get(rightId).data;
+            return byPair.get(key(left.i + right.i, left.j + right.j));
+          },
+          defaultGenerators: ["a", "b"],
+          legendHTML: "Presentation: <strong>⟨a, b ∣ a<sup>4</sup> = b<sup>2</sup> = e, ab = ba⟩</strong>"
+        };
+      }
+
+      {
+        const specs = [
+          ["e", 0, "e"], ["a", 1, "a"], ["b", 2, "b"], ["ab", 3, "ab"],
+          ["c", 4, "c"], ["ac", 5, "ac"], ["bc", 6, "bc"], ["abc", 7, "abc"]
+        ];
+        const elements = specs.map(([id, bits, label]) => makeElement(
+          id, label, label, [{ text: label }], bits
+        ));
+        const byBits = new Map(elements.map((element) => [element.data, element.id]));
+        const byId = new Map(elements.map((element) => [element.id, element]));
+        groups.C2xC2xC2 = {
+          key: "C2xC2xC2",
+          titleHTML: "The group C<sub>2</sub> × C<sub>2</sub> × C<sub>2</sub>",
+          titlePlain: "The group C2 × C2 × C2",
+          elements,
+          identityId: "e",
+          slotOrder: ["e", "a", "ab", "b", "c", "ac", "abc", "bc"],
+          slotPositions: cubeSlotPositions,
+          visualCenter: cubeCenter,
+          layoutKind: "cube",
+          layoutDescription: "at the projected vertices of a cube",
+          multiply: (leftId, rightId) => byBits.get(byId.get(leftId).data ^ byId.get(rightId).data),
+          defaultGenerators: ["a", "b", "c"],
+          legendHTML: "Presentation: <strong>⟨a, b, c ∣ a<sup>2</sup> = b<sup>2</sup> = c<sup>2</sup> = e, ab = ba, ac = ca, bc = cb⟩</strong>"
+        };
+      }
+
+      {
+        const specs = [
+          ["e", 0, 0], ["r", 1, 0], ["r2", 2, 0], ["r3", 3, 0],
+          ["s", 0, 1], ["rs", 1, 1], ["r2s", 2, 1], ["r3s", 3, 1]
+        ];
+        const elements = specs.map(([id, i, j]) => makeElement(
+          id,
+          i === 0 ? (j ? "s" : "e") : powerLabel("r", i, j ? "s" : ""),
+          i === 0 ? (j ? "s" : "e") : powerPlain("r", i, j ? "s" : ""),
+          i === 0 ? [{ text: j ? "s" : "e" }] : powerSvg("r", i, j ? "s" : ""),
+          { i, j }
+        ));
+        const key = (i, j) => `${mod(i, 4)},${mod(j, 2)}`;
+        const byPair = new Map(elements.map((element) => [key(element.data.i, element.data.j), element.id]));
+        const byId = new Map(elements.map((element) => [element.id, element]));
+        groups.D8 = {
+          key: "D8",
+          titleHTML: "The dihedral group D<sub>8</sub>",
+          titlePlain: "The dihedral group D8",
+          elements,
+          identityId: "e",
+          slotOrder: ["e", "r", "r2", "r3", "s", "rs", "r2s", "r3s"],
+          slotPositions: cubeSlotPositions,
+          visualCenter: cubeCenter,
+          layoutKind: "cube",
+          layoutDescription: "at the projected vertices of a cube",
+          multiply: (leftId, rightId) => {
+            const left = byId.get(leftId).data;
+            const right = byId.get(rightId).data;
+            const i = left.i + (left.j === 0 ? right.i : -right.i);
+            return byPair.get(key(i, left.j + right.j));
+          },
+          defaultGenerators: ["r", "s"],
+          legendHTML: "Presentation: <strong>⟨r, s ∣ r<sup>4</sup> = s<sup>2</sup> = e, srs<sup>−1</sup> = r<sup>−1</sup>⟩</strong>"
+        };
+      }
+
+      {
+        const quaternionSpecs = [
+          ["one", 1, 0, "1"], ["minusOne", -1, 0, "−1"],
+          ["i", 1, 1, "i"], ["minusI", -1, 1, "−i"],
+          ["j", 1, 2, "j"], ["minusJ", -1, 2, "−j"],
+          ["k", 1, 3, "k"], ["minusK", -1, 3, "−k"]
+        ];
+        const elements = quaternionSpecs.map(([id, sign, basis, label]) => makeElement(
+          id, label, label, [{ text: label }], { sign, basis }
+        ));
+        const byId = new Map(elements.map((element) => [element.id, element]));
+        const bySignedBasis = new Map(elements.map((element) => [`${element.data.sign},${element.data.basis}`, element.id]));
+        const basisProduct = [
+          [[1, 0], [1, 1], [1, 2], [1, 3]],
+          [[1, 1], [-1, 0], [1, 3], [-1, 2]],
+          [[1, 2], [-1, 3], [-1, 0], [1, 1]],
+          [[1, 3], [1, 2], [-1, 1], [-1, 0]]
+        ];
+        groups.Q8 = {
+          key: "Q8",
+          titleHTML: "The quaternion group Q<sub>8</sub>",
+          titlePlain: "The quaternion group Q8",
+          elements,
+          identityId: "one",
+          slotOrder: ["one", "minusOne", "i", "minusI", "j", "minusJ", "k", "minusK"],
+          slotPositions: quaternionSlotPositions,
+          visualCenter: quaternionCenter,
+          layoutKind: "quaternion",
+          layoutDescription:
+            "with 1 and −1 on a vertical axis inside a hexagon carrying ±i, ±j and ±k",
+          multiply: (leftId, rightId) => {
+            const left = byId.get(leftId).data;
+            const right = byId.get(rightId).data;
+            const [basisSign, basis] = basisProduct[left.basis][right.basis];
+            return bySignedBasis.get(`${left.sign * right.sign * basisSign},${basis}`);
+          },
+          defaultGenerators: ["i", "j"],
+          legendHTML: "Presentation: <strong>⟨i, j ∣ i<sup>4</sup> = e, i<sup>2</sup> = j<sup>2</sup>, jij<sup>−1</sup> = i<sup>−1</sup>⟩</strong>",
+          legendNoteHTML: "Equivalently, i<sup>2</sup> = j<sup>2</sup> = k<sup>2</sup> = ijk = −1."
+        };
+      }
+
+      return groups;
+    }
+
+    function slotPositionsFor(group) {
+      return new Map(group.slotOrder.map((elementId, index) => [elementId, group.slotPositions[index]]));
+    }
+
+    function applyOperationWith(group, operation, elementId) {
+      return operation.side === "left"
+        ? group.multiply(operation.elementId, elementId)
+        : group.multiply(elementId, operation.elementId);
+    }
+
+    // An involution is exactly the case where every arrow has its reverse in
+    // the same picture, since x → xg and xg → x both appear only when g² = e.
+    function isInvolution(group, elementId) {
+      return elementId !== group.identityId
+        && group.multiply(elementId, elementId) === group.identityId;
+    }
+
+    function elementOrderIn(group, elementId) {
+      let product = group.identityId;
+      for (let n = 1; n <= group.elements.length; n += 1) {
+        product = group.multiply(product, elementId);
+        if (product === group.identityId) return n;
+      }
+      throw new Error(`Could not determine order of ${elementId}`);
+    }
+
+    function animationDurationMs(prefersReducedMotion) {
+      return prefersReducedMotion ? 0 : ANIMATION_DURATION_MS;
+    }
+
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    function distance(a, b) {
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    function cubicPoint(curve, t) {
+      const u = 1 - t;
+      return {
+        x: u ** 3 * curve.p0.x + 3 * u ** 2 * t * curve.p1.x + 3 * u * t ** 2 * curve.p2.x + t ** 3 * curve.p3.x,
+        y: u ** 3 * curve.p0.y + 3 * u ** 2 * t * curve.p1.y + 3 * u * t ** 2 * curve.p2.y + t ** 3 * curve.p3.y
+      };
+    }
+
+    // Splits the permutation induced by an order-four element into its two
+    // four-cycles and fits a closed Catmull-Rom loop through each, so that the
+    // dots travel along a rounded circuit instead of cutting straight across.
+    function buildFourCycleSegments(group, slotPositions, operation) {
+      const segments = new Map();
+      const visited = new Set();
+      for (const element of group.elements) {
+        if (visited.has(element.id)) continue;
+        const cycle = [];
+        let current = element.id;
+        while (!visited.has(current)) {
+          visited.add(current);
+          cycle.push(current);
+          current = applyOperationWith(group, operation, current);
+        }
+        if (cycle.length !== 4 || current !== cycle[0]) {
+          throw new Error("An order-four multiplication did not decompose into four-cycles.");
+        }
+        const points = cycle.map((id) => slotPositions.get(id));
+        for (let index = 0; index < 4; index += 1) {
+          const previous = points[mod(index - 1, 4)];
+          const start = points[index];
+          const end = points[(index + 1) % 4];
+          const following = points[(index + 2) % 4];
+          const scale = CATMULL_ROM_TENSION / 6;
+          segments.set(cycle[index], {
+            p0: { ...start },
+            p1: {
+              x: start.x + (end.x - previous.x) * scale,
+              y: start.y + (end.y - previous.y) * scale
+            },
+            p2: {
+              x: end.x - (following.x - start.x) * scale,
+              y: end.y - (following.y - start.y) * scale
+            },
+            p3: { ...end }
+          });
+        }
+      }
+      return segments;
+    }
+
+    // The single source of arrow geometry. It depends on nothing but the two
+    // endpoints and the layout centre, so a preview arrow and a Cayley arrow
+    // that share a source and a target are drawn as the same curve.
+    //
+    // The bend is normally taken to the side of travel, which makes a mutual
+    // pair of arrows open into a lens instead of overlapping. Passing an
+    // `outwardFrom` point instead swings it to whichever side faces away from
+    // that point, so a cycle of arrows reads as a rounded circuit whether it
+    // runs clockwise or counter-clockwise — without it, a counter-clockwise
+    // face came out as a four-pointed star. Callers pass the centre of the
+    // circuit the arrow belongs to.
+    function arrowPathBetween(source, target, outwardFrom = null) {
+      const dx = target.x - source.x;
+      const dy = target.y - source.y;
+      const length = Math.hypot(dx, dy);
+      if (length < 6) return null;
+      const ux = dx / length;
+      const uy = dy / length;
+      const startClearance = Math.min(START_ARROW_CLEARANCE, length * 0.35);
+      const endClearance = Math.min(END_ARROW_CLEARANCE, length * 0.45);
+      const start = { x: source.x + ux * startClearance, y: source.y + uy * startClearance };
+      const end = { x: target.x - ux * endClearance, y: target.y - uy * endClearance };
+      const nx = uy;
+      const ny = -ux;
+      const middle = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+      let bend = Math.min(ARROW_BEND_MAX, Math.max(ARROW_BEND_MIN, length * ARROW_BEND_RATIO));
+      if (outwardFrom) {
+        // How far the travel-side normal already points away from the circuit's
+        // centre, in pixels. Softening the sign means a chord that sweeps past
+        // the centre during an animation flattens through straight rather than
+        // snapping over, and a circuit with no sensible outward direction — a
+        // self-crossing one — simply draws close to straight.
+        const outwardness = nx * (middle.x - outwardFrom.x) + ny * (middle.y - outwardFrom.y);
+        bend *= outwardness / Math.hypot(outwardness, OUTWARD_SOFTENING);
+      }
+      const control = { x: middle.x + nx * bend, y: middle.y + ny * bend };
+      return `M ${start.x.toFixed(1)} ${start.y.toFixed(1)} Q ${control.x.toFixed(1)} ${control.y.toFixed(1)} ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+    }
+
+    // Fixed points get a loop that flares away from the middle of the layout,
+    // so it never lands on top of a neighbouring dot.
+    function loopPathAt(center, layoutCenter) {
+      let vx = center.x - layoutCenter.x;
+      let vy = center.y - layoutCenter.y;
+      const length = Math.hypot(vx, vy) || 1;
+      vx /= length;
+      vy /= length;
+      const tx = -vy;
+      const ty = vx;
+      const start = {
+        x: center.x + vx * (DOT_RADIUS - 2) + tx * LOOP_SPREAD,
+        y: center.y + vy * (DOT_RADIUS - 2) + ty * LOOP_SPREAD
+      };
+      const end = {
+        x: center.x + vx * (DOT_RADIUS - 2) - tx * LOOP_SPREAD,
+        y: center.y + vy * (DOT_RADIUS - 2) - ty * LOOP_SPREAD
+      };
+      const c1 = { x: start.x + vx * LOOP_REACH + tx * LOOP_FLARE, y: start.y + vy * LOOP_REACH + ty * LOOP_FLARE };
+      const c2 = { x: end.x + vx * LOOP_REACH - tx * LOOP_FLARE, y: end.y + vy * LOOP_REACH - ty * LOOP_FLARE };
+      return `M ${start.x.toFixed(1)} ${start.y.toFixed(1)} C ${c1.x.toFixed(1)} ${c1.y.toFixed(1)}, ${c2.x.toFixed(1)} ${c2.y.toFixed(1)}, ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+    }
+
+    function pathForArrow(arrow, layoutCenter) {
+      if (arrow.loop) return loopPathAt(arrow.from, layoutCenter);
+      // Mutually paired arrows keep the travel-side bend so they separate into
+      // a lens — their circuit is a single chord, which has no outside. Every
+      // other arrow bows away from the centre of its own circuit.
+      const outwardFrom = arrow.paired ? null : arrow.center;
+      return arrowPathBetween(arrow.from, arrow.to, outwardFrom)
+        ?? loopPathAt(arrow.from, layoutCenter);
+    }
+
+    // The centre of the circuit each dot travels round under a permutation.
+    // Taken from live coordinates, so it drifts with the dots during an
+    // animation instead of jumping when the picture settles.
+    function cycleCenters(group, liveCoordinates, step) {
+      const centers = new Map();
+      const visited = new Set();
+      for (const element of group.elements) {
+        if (visited.has(element.id)) continue;
+        const cycle = [];
+        let current = element.id;
+        while (!visited.has(current)) {
+          visited.add(current);
+          cycle.push(current);
+          current = step(current);
+        }
+        const total = cycle.reduce((sum, id) => {
+          const point = liveCoordinates.get(id);
+          return { x: sum.x + point.x, y: sum.y + point.y };
+        }, { x: 0, y: 0 });
+        const center = { x: total.x / cycle.length, y: total.y / cycle.length };
+        for (const id of cycle) centers.set(id, center);
+      }
+      return centers;
+    }
+
+    // Where each label will have landed once every queued operation has run.
+    function projectImages(group, imageMap, pendingOperations) {
+      const projected = new Map(imageMap);
+      for (const operation of pendingOperations) {
+        for (const label of group.elements) {
+          projected.set(label.id, applyOperationWith(group, operation, projected.get(label.id)));
+        }
+      }
+      return projected;
+    }
+
+    // Preview arrows run from a dot to the dot whose slot it is about to take
+    // over — the label that the queue plus the hovered operation will leave
+    // standing on the destination. Naming the head as a dot rather than as a
+    // fixed slot is what lets both ends of the arrow travel during an
+    // animation; at rest the target dot is sitting on that slot anyway, so
+    // this agrees with the Cayley arrows exactly.
+    function previewArrows(group, liveCoordinates, imageMap, pendingOperations, operation) {
+      const projected = projectImages(group, imageMap, pendingOperations);
+      const labelByImage = new Map([...projected].map(([labelId, image]) => [image, labelId]));
+      const paired = isInvolution(group, operation.elementId);
+      const step = (labelId) =>
+        labelByImage.get(applyOperationWith(group, operation, projected.get(labelId)));
+      const centers = cycleCenters(group, liveCoordinates, step);
+      return group.elements.map((label) => {
+        const targetId = step(label.id);
+        return {
+          id: label.id,
+          targetId,
+          from: liveCoordinates.get(label.id),
+          to: liveCoordinates.get(targetId),
+          loop: targetId === label.id,
+          paired,
+          center: centers.get(label.id)
+        };
+      });
+    }
+
+    // Cayley arrows join labelled dots, so they deform with the dots during an
+    // animation rather than disappearing.
+    function cayleyArrows(group, liveCoordinates, generatorId, side) {
+      const paired = isInvolution(group, generatorId);
+      const step = (elementId) => side === "left"
+        ? group.multiply(generatorId, elementId)
+        : group.multiply(elementId, generatorId);
+      const centers = cycleCenters(group, liveCoordinates, step);
+      return group.elements.map((source) => {
+        const targetId = step(source.id);
+        return {
+          id: source.id,
+          targetId,
+          from: liveCoordinates.get(source.id),
+          to: liveCoordinates.get(targetId),
+          loop: targetId === source.id,
+          paired,
+          center: centers.get(source.id)
+        };
+      });
+    }
+
+    /* core:end */
+
+    const groups = buildGroups();
+    let group = groups.D8;
+    let elements = group.elements;
+    let elementById = new Map(elements.map((element) => [element.id, element]));
+    let positions = new Map();
+
+    const workspace = document.getElementById("workspace");
+    const pageTitle = document.getElementById("page-title");
+    const groupSelect = document.getElementById("group-select");
+    const leftButtons = document.getElementById("left-buttons");
+    const rightButtons = document.getElementById("right-buttons");
+    const generatorButtons = document.getElementById("generator-buttons");
+    const transformationReadout = document.getElementById("transformation");
+    const statusReadout = document.getElementById("status");
+    const resetButton = document.getElementById("reset-button");
+    const cayleyVisibleInput = document.getElementById("cayley-visible");
+    const cayleySideInputs = [...document.querySelectorAll('input[name="cayley-side"]')];
+    const cayleySummary = document.getElementById("cayley-summary");
+    const svgDefs = document.getElementById("svg-defs");
+    const dotLayer = document.getElementById("dot-layer");
+    const previewLayer = document.getElementById("preview-layer");
+    const cayleyLayer = document.getElementById("cayley-layer");
+    const legend = document.getElementById("legend");
+    const visualization = document.getElementById("visualization");
+
+    const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    const dotNodes = new Map();
+    const generatorButtonNodes = new Map();
+    const queue = [];
+    const selectedCayleyElements = new Set();
+    const imageByLabel = new Map();
+    const currentCoordinates = new Map();
+
+    let isAnimating = false;
+    let activeOperation = null;
+    let animationGeneration = 0;
+    let netLeft = group.identityId;
+    let netRight = group.identityId;
+    let hoveredOperation = null;
+    let previewNodes = [];
+    let cayleyBundles = [];
+    let finishActiveAnimation = null;
+
+    function createSvgElement(name, attributes = {}) {
+      const node = document.createElementNS("http://www.w3.org/2000/svg", name);
+      for (const [key, value] of Object.entries(attributes)) {
+        node.setAttribute(key, String(value));
+      }
+      return node;
+    }
+
+    function installCayleyMarkers() {
+      svgDefs.querySelectorAll(".dynamic-cayley-marker").forEach((node) => node.remove());
+      cayleyColors.forEach((color, index) => {
+        const marker = createSvgElement("marker", {
+          id: `cayley-arrowhead-${index}`,
+          class: "dynamic-cayley-marker",
+          markerWidth: 9,
+          markerHeight: 9,
+          refX: 7.4,
+          refY: 4.5,
+          orient: "auto",
+          markerUnits: "strokeWidth"
+        });
+        marker.appendChild(createSvgElement("path", {
+          d: "M 0 0 L 9 4.5 L 0 9 z",
+          fill: color
+        }));
+        svgDefs.appendChild(marker);
+      });
+    }
+
+    function setGroup(groupKey) {
+      animationGeneration += 1;
+      finishActiveAnimation = null;
+      group = groups[groupKey];
+      elements = group.elements;
+      elementById = new Map(elements.map((element) => [element.id, element]));
+      positions = slotPositionsFor(group);
+
+      pageTitle.innerHTML = group.titleHTML;
+      document.title = `${group.titlePlain} — Groups of Order 8 Visualizer`;
+      workspace.setAttribute("aria-label", `${group.titlePlain} multiplication visualizer`);
+      visualization.setAttribute(
+        "aria-label",
+        `Eight elements of ${group.titlePlain} arranged ${group.layoutDescription}`
+      );
+      legend.innerHTML = group.legendNoteHTML
+        ? `${group.legendHTML}<span class="legend-note">${group.legendNoteHTML}</span>`
+        : group.legendHTML;
+
+      rebuildDots();
+      rebuildMultiplicationButtons();
+      rebuildGeneratorButtons();
+      resetAllControlsForGroup();
+    }
+
+    function rebuildDots() {
+      dotLayer.replaceChildren();
+      dotNodes.clear();
+      for (const element of elements) {
+        const groupNode = createSvgElement("g", {
+          "data-label": element.id,
+          "aria-label": element.plain
+        });
+        const circle = createSvgElement("circle", { class: "dot", r: DOT_RADIUS });
+        const text = createSvgElement("text", { class: "dot-label" });
+        for (const part of element.svgParts) {
+          const tspan = createSvgElement("tspan");
+          tspan.textContent = part.text;
+          if (part.superscript) {
+            tspan.setAttribute("font-size", "14");
+            tspan.setAttribute("baseline-shift", "super");
+          }
+          text.appendChild(tspan);
+        }
+        groupNode.append(circle, text);
+        dotLayer.appendChild(groupNode);
+        dotNodes.set(element.id, { group: groupNode, circle, text });
+      }
+    }
+
+    function rebuildMultiplicationButtons() {
+      leftButtons.replaceChildren();
+      rightButtons.replaceChildren();
+      createButtons(leftButtons, "left");
+      createButtons(rightButtons, "right");
+    }
+
+    function createButtons(container, side) {
+      for (const element of elements) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.innerHTML = element.html;
+        button.setAttribute("aria-label", `${side === "left" ? "Left" : "Right"} multiply by ${element.plain}`);
+        const operation = { side, elementId: element.id };
+        button.addEventListener("mouseenter", () => setHoveredOperation(operation));
+        button.addEventListener("mouseleave", () => setHoveredOperation(null));
+        button.addEventListener("focus", () => setHoveredOperation(operation));
+        button.addEventListener("blur", () => setHoveredOperation(null));
+        button.addEventListener("click", () => enqueueOperation(operation));
+        container.appendChild(button);
+      }
+    }
+
+    function rebuildGeneratorButtons() {
+      generatorButtons.replaceChildren();
+      generatorButtonNodes.clear();
+      elements.forEach((element, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "generator-toggle";
+        button.setAttribute("aria-pressed", "false");
+        button.setAttribute("aria-label", `Toggle Cayley arrows for ${element.plain}`);
+        button.style.setProperty("--generator-color", cayleyColors[index]);
+        const dash = cayleyDashes[index];
+        button.innerHTML =
+          `<span>${element.html}</span>` +
+          `<svg class="generator-swatch" viewBox="0 0 34 10" aria-hidden="true">` +
+          `<line x1="2" y1="5" x2="32" y2="5" stroke="var(--generator-color)" stroke-width="3.2"` +
+          ` stroke-linecap="round"${dash ? ` stroke-dasharray="${dash}"` : ""} /></svg>`;
+        button.addEventListener("click", () => toggleCayleyElement(element.id));
+        generatorButtons.appendChild(button);
+        generatorButtonNodes.set(element.id, button);
+      });
+    }
+
+    function resetAllControlsForGroup() {
+      queue.length = 0;
+      selectedCayleyElements.clear();
+      for (const elementId of group.defaultGenerators) selectedCayleyElements.add(elementId);
+      isAnimating = false;
+      activeOperation = null;
+      hoveredOperation = null;
+      netLeft = group.identityId;
+      netRight = group.identityId;
+      cayleyVisibleInput.checked = false;
+      cayleySideInputs.forEach((input) => { input.checked = input.value === "right"; });
+      workspace.classList.remove("cayley-open");
+      imageByLabel.clear();
+      currentCoordinates.clear();
+      for (const element of elements) {
+        imageByLabel.set(element.id, element.id);
+        setDotPosition(element.id, positions.get(element.id));
+      }
+      updateGeneratorButtonStates();
+      updateCayleySummary();
+      renderTransformation();
+      updateStatus();
+      rebuildOverlays();
+    }
+
+    function resetAction() {
+      animationGeneration += 1;
+      finishActiveAnimation = null;
+      queue.length = 0;
+      isAnimating = false;
+      activeOperation = null;
+      hoveredOperation = null;
+      netLeft = group.identityId;
+      netRight = group.identityId;
+      imageByLabel.clear();
+      for (const element of elements) {
+        imageByLabel.set(element.id, element.id);
+        setDotPosition(element.id, positions.get(element.id));
+      }
+      renderTransformation();
+      updateStatus();
+      rebuildOverlays();
+    }
+
+    function setDotPosition(labelId, point) {
+      currentCoordinates.set(labelId, { x: point.x, y: point.y });
+      const nodes = dotNodes.get(labelId);
+      nodes.circle.setAttribute("cx", point.x);
+      nodes.circle.setAttribute("cy", point.y);
+      nodes.text.setAttribute("x", point.x);
+      nodes.text.setAttribute("y", point.y + 1);
+    }
+
+    function pendingOperations() {
+      return activeOperation ? [activeOperation, ...queue] : [...queue];
+    }
+
+    function enqueueOperation(operation) {
+      queue.push(operation);
+      updateNetTransformation(operation);
+      updateStatus();
+      processQueue();
+      // The pointer is usually still resting on the button, so re-aim the
+      // preview at the state the queue now leads to instead of dropping it.
+      updateOverlayGeometry();
+    }
+
+    function updateNetTransformation(operation) {
+      if (operation.side === "left") {
+        netLeft = group.multiply(operation.elementId, netLeft);
+      } else {
+        netRight = group.multiply(netRight, operation.elementId);
+      }
+      renderTransformation();
+    }
+
+    function renderTransformation() {
+      if (netLeft === group.identityId && netRight === group.identityId) {
+        transformationReadout.innerHTML = "x &mapsto; x";
+        return;
+      }
+      const leftText = netLeft === group.identityId ? "" : elementById.get(netLeft).html;
+      let rightText = "";
+      if (netRight !== group.identityId) {
+        const rightElement = elementById.get(netRight);
+        rightText = rightElement.plain.startsWith("−") || rightElement.plain.startsWith("-")
+          ? `(${rightElement.html})`
+          : rightElement.html;
+      }
+      transformationReadout.innerHTML = `x &mapsto; ${leftText}x${rightText}`;
+    }
+
+    function operationDescription(operation) {
+      return `${operation.side === "left" ? "left" : "right"} multiply by ${elementById.get(operation.elementId).plain}`;
+    }
+
+    function updateStatus() {
+      if (isAnimating && activeOperation) {
+        const waiting = queue.length;
+        statusReadout.textContent = `Performing: ${operationDescription(activeOperation)}${waiting ? ` · ${waiting} queued` : ""}`;
+      } else if (queue.length > 0) {
+        statusReadout.textContent = `${queue.length} operation${queue.length === 1 ? "" : "s"} queued`;
+      } else {
+        statusReadout.textContent = "Ready";
+      }
+    }
+
+    function processQueue() {
+      if (isAnimating || queue.length === 0) {
+        updateStatus();
+        updateOverlayGeometry();
+        return;
+      }
+
+      activeOperation = queue.shift();
+      isAnimating = true;
+      updateStatus();
+
+      const generation = animationGeneration;
+      const duration = animationDurationMs(reducedMotionQuery.matches);
+      const startCoordinates = new Map(elements.map((element) => [element.id, { ...currentCoordinates.get(element.id) }]));
+      const destinationImages = new Map();
+      const destinationCoordinates = new Map();
+
+      for (const label of elements) {
+        const currentImage = imageByLabel.get(label.id);
+        const destinationImage = applyOperationWith(group, activeOperation, currentImage);
+        destinationImages.set(label.id, destinationImage);
+        destinationCoordinates.set(label.id, positions.get(destinationImage));
+      }
+
+      const useFourCycleAnimation = elementOrderIn(group, activeOperation.elementId) === 4;
+      const fourCycleSegments = useFourCycleAnimation
+        ? buildFourCycleSegments(group, positions, activeOperation)
+        : null;
+      const startTime = performance.now();
+
+      function complete() {
+        if (generation !== animationGeneration) return;
+        animationGeneration += 1;
+        finishActiveAnimation = null;
+        for (const label of elements) {
+          imageByLabel.set(label.id, destinationImages.get(label.id));
+          setDotPosition(label.id, destinationCoordinates.get(label.id));
+        }
+        isAnimating = false;
+        activeOperation = null;
+        updateStatus();
+        updateOverlayGeometry();
+        processQueue();
+      }
+
+      finishActiveAnimation = complete;
+
+      function frame(now) {
+        if (generation !== animationGeneration) return;
+        const rawProgress = duration <= 0
+          ? 1
+          : Math.min(1, Math.max(0, (now - startTime) / duration));
+
+        if (rawProgress >= 1) {
+          complete();
+          return;
+        }
+
+        const progress = easeInOutCubic(rawProgress);
+        for (const label of elements) {
+          const start = startCoordinates.get(label.id);
+          const destination = destinationCoordinates.get(label.id);
+          if (rawProgress === 0) {
+            setDotPosition(label.id, start);
+          } else if (useFourCycleAnimation) {
+            setDotPosition(label.id, cubicPoint(fourCycleSegments.get(imageByLabel.get(label.id)), progress));
+          } else {
+            setDotPosition(label.id, {
+              x: start.x + (destination.x - start.x) * progress,
+              y: start.y + (destination.y - start.y) * progress
+            });
+          }
+        }
+
+        updateOverlayGeometry();
+        requestAnimationFrame(frame);
+      }
+
+      frame(startTime);
+    }
+
+    // requestAnimationFrame stops firing in a hidden tab, which would otherwise
+    // strand the queue mid-flight. Settle everything synchronously instead.
+    function flushAnimations() {
+      let guard = 0;
+      while (finishActiveAnimation && guard < 64) {
+        guard += 1;
+        finishActiveAnimation();
+      }
+    }
+
+    function setHoveredOperation(operation) {
+      const sameOperation = hoveredOperation && operation
+        && hoveredOperation.side === operation.side
+        && hoveredOperation.elementId === operation.elementId;
+      if (sameOperation || (!hoveredOperation && !operation)) return;
+      hoveredOperation = operation;
+      rebuildPreviewLayer();
+    }
+
+    function toggleCayleyElement(elementId) {
+      if (selectedCayleyElements.has(elementId)) selectedCayleyElements.delete(elementId);
+      else selectedCayleyElements.add(elementId);
+      updateGeneratorButtonStates();
+      updateCayleySummary();
+      rebuildCayleyLayer();
+    }
+
+    function updateGeneratorButtonStates() {
+      for (const element of elements) {
+        const button = generatorButtonNodes.get(element.id);
+        if (button) button.setAttribute("aria-pressed", String(selectedCayleyElements.has(element.id)));
+      }
+    }
+
+    function currentCayleySide() {
+      return cayleySideInputs.find((input) => input.checked)?.value ?? "right";
+    }
+
+    function updateCayleySummary() {
+      const selected = elements.filter((element) => selectedCayleyElements.has(element.id));
+      if (selected.length === 0) {
+        cayleySummary.textContent = "No elements selected.";
+        return;
+      }
+      cayleySummary.innerHTML = `Selected: ${selected.map((element) => element.html).join(", ")}.`;
+    }
+
+    function rebuildOverlays() {
+      rebuildPreviewLayer();
+      rebuildCayleyLayer();
+    }
+
+    function rebuildPreviewLayer() {
+      previewLayer.replaceChildren();
+      previewNodes = [];
+      if (!hoveredOperation) return;
+      const stroke = hoveredOperation.side === "left" ? "#315fbd" : "#9b4d2a";
+      const marker = hoveredOperation.side === "left" ? "url(#arrowhead-left)" : "url(#arrowhead-right)";
+      for (let index = 0; index < elements.length; index += 1) {
+        const node = createSvgElement("path", { class: "preview-arrow", stroke, "marker-end": marker });
+        previewLayer.appendChild(node);
+        previewNodes.push(node);
+      }
+      updatePreviewGeometry();
+    }
+
+    function updatePreviewGeometry() {
+      if (!hoveredOperation || previewNodes.length !== elements.length) return;
+      const arrows = previewArrows(
+        group, currentCoordinates, imageByLabel, pendingOperations(), hoveredOperation
+      );
+      arrows.forEach((arrow, index) => {
+        const node = previewNodes[index];
+        node.setAttribute("class", arrow.loop ? "preview-loop" : "preview-arrow");
+        node.setAttribute("d", pathForArrow(arrow, group.visualCenter));
+      });
+    }
+
+    function rebuildCayleyLayer() {
+      cayleyLayer.replaceChildren();
+      cayleyBundles = [];
+      if (!cayleyVisibleInput.checked) return;
+      const side = currentCayleySide();
+      elements.forEach((element, colorIndex) => {
+        if (!selectedCayleyElements.has(element.id)) return;
+        const dash = cayleyDashes[colorIndex];
+        const nodes = elements.map(() => {
+          const node = createSvgElement("path", {
+            class: "cayley-arrow",
+            stroke: cayleyColors[colorIndex],
+            "stroke-dasharray": dash || "none",
+            "marker-end": `url(#cayley-arrowhead-${colorIndex})`
+          });
+          cayleyLayer.appendChild(node);
+          return node;
+        });
+        cayleyBundles.push({ generatorId: element.id, side, nodes });
+      });
+      updateCayleyGeometry();
+    }
+
+    function updateCayleyGeometry() {
+      for (const bundle of cayleyBundles) {
+        const arrows = cayleyArrows(group, currentCoordinates, bundle.generatorId, bundle.side);
+        arrows.forEach((arrow, index) => {
+          const node = bundle.nodes[index];
+          node.setAttribute("class", arrow.loop ? "cayley-loop" : "cayley-arrow");
+          node.setAttribute("d", pathForArrow(arrow, group.visualCenter));
+        });
+      }
+    }
+
+    function updateOverlayGeometry() {
+      updatePreviewGeometry();
+      updateCayleyGeometry();
+    }
+
+    groupSelect.addEventListener("change", () => setGroup(groupSelect.value));
+    resetButton.addEventListener("click", resetAction);
+    cayleyVisibleInput.addEventListener("change", () => {
+      workspace.classList.toggle("cayley-open", cayleyVisibleInput.checked);
+      rebuildCayleyLayer();
+    });
+    cayleySideInputs.forEach((input) => input.addEventListener("change", rebuildCayleyLayer));
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) flushAnimations();
+    });
+
+    installCayleyMarkers();
+    setGroup("D8");
+
+    window.__groupVisualizer = {
+      groups,
+      setGroup,
+      flushAnimations,
+      state: () => ({ netLeft, netRight, queued: queue.length, isAnimating })
+    };
+  </script>
+</body>
+</html>
