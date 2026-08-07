@@ -17,6 +17,8 @@
       --left-soft: #eaf0ff;
       --right: #9b4d2a;
       --right-soft: #fff0e9;
+      --conj: #6d3fa3;
+      --conj-soft: #f4eefc;
       --dot-fill: #ffffff;
       --dot-stroke: #172033;
       --shadow: 0 18px 50px rgba(31, 42, 68, 0.12);
@@ -101,7 +103,7 @@
 
     .workspace {
       display: grid;
-      grid-template-columns: minmax(145px, 185px) minmax(470px, 1fr) minmax(145px, 185px);
+      grid-template-columns: minmax(168px, 212px) minmax(470px, 1fr);
       gap: 18px;
       align-items: stretch;
       transition: grid-template-columns 180ms ease;
@@ -109,9 +111,8 @@
 
     .workspace.cayley-open {
       grid-template-columns:
-        minmax(140px, 175px)
+        minmax(168px, 212px)
         minmax(460px, 1fr)
-        minmax(140px, 175px)
         minmax(200px, 240px);
     }
 
@@ -159,18 +160,30 @@
     button:hover,
     button:focus-visible { transform: translateY(-1px); }
 
-    .left-controls button:hover,
-    .left-controls button:focus-visible {
-      border-color: var(--left);
-      background: var(--left-soft);
-      box-shadow: 0 6px 18px rgba(49, 95, 189, 0.16);
+    /* One column of buttons now, tinted by whichever action is selected. */
+    .act-controls { --act: var(--left); --act-soft: var(--left-soft); }
+    .act-controls[data-side="right"] { --act: var(--right); --act-soft: var(--right-soft); }
+    .act-controls[data-side="conjugate"] { --act: var(--conj); --act-soft: var(--conj-soft); }
+
+    .act-controls #act-buttons button:hover,
+    .act-controls #act-buttons button:focus-visible {
+      border-color: var(--act);
+      background: var(--act-soft);
+      box-shadow: 0 6px 18px color-mix(in srgb, var(--act) 22%, transparent);
     }
 
-    .right-controls button:hover,
-    .right-controls button:focus-visible {
-      border-color: var(--right);
-      background: var(--right-soft);
-      box-shadow: 0 6px 18px rgba(155, 77, 42, 0.16);
+    .act-controls h2 { color: var(--act); }
+
+    .action-modes { margin-bottom: 12px; }
+
+    .action-modes .radio-row input { accent-color: var(--act); }
+
+    #act-note:empty { display: none; }
+
+    #act-note {
+      margin-top: 10px;
+      padding-top: 9px;
+      border-top: 1px solid var(--border);
     }
 
     .visual-panel {
@@ -485,18 +498,12 @@
         grid-row: 2;
       }
 
-      .left-controls {
+      .act-controls {
         grid-column: 1;
         grid-row: 2;
       }
 
-      .right-controls {
-        grid-column: 2;
-        grid-row: 2;
-      }
-
-      .workspace.cayley-open .left-controls,
-      .workspace.cayley-open .right-controls { grid-row: 3; }
+      .workspace.cayley-open .act-controls { grid-row: 3; }
 
       .controls { padding: 14px; }
 
@@ -529,9 +536,9 @@
         bottom: 0;
         z-index: 30;
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 6px;
-        padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 5px;
+        padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
         background: rgba(255, 255, 255, 0.97);
         border-top: 1px solid var(--border);
         box-shadow: 0 -6px 24px rgba(31, 42, 68, 0.1);
@@ -540,8 +547,8 @@
 
       .dock-tab {
         min-height: 40px;
-        padding: 6px 4px;
-        font-size: 0.85rem;
+        padding: 6px 2px;
+        font-size: 0.8rem;
         font-weight: 700;
       }
 
@@ -562,6 +569,12 @@
         color: var(--right);
       }
 
+      .dock-tab[data-dock="conjugate"][aria-pressed="true"] {
+        border-color: var(--conj);
+        background: var(--conj-soft);
+        color: var(--conj);
+      }
+
       /* Specificity here has to beat `.workspace.cayley-open .cayley-controls`,
          hence the attribute selector rather than a bare class. */
       .workspace[data-dock] .controls {
@@ -577,12 +590,13 @@
         border-radius: 14px;
       }
 
-      .workspace[data-dock="left"] .left-controls,
-      .workspace[data-dock="right"] .right-controls,
+      .workspace[data-dock="act"] .act-controls,
       .workspace[data-dock="cayley"] .cayley-controls { display: flex; }
 
-      .left-controls { border-top: 3px solid var(--left); }
-      .right-controls { border-top: 3px solid var(--right); }
+      .act-controls { border-top: 3px solid var(--act); }
+
+      /* The tab bar is the action switch on mobile. */
+      .action-modes { display: none; }
 
       /* The tab already names the panel. */
       .controls h2 { display: none; }
@@ -640,9 +654,25 @@
     </header>
 
     <section id="workspace" class="workspace" aria-label="Group multiplication visualizer">
-      <aside class="panel controls left-controls">
-        <h2>Left multiply by</h2>
-        <div id="left-buttons" class="button-list"></div>
+      <aside id="act-controls" class="panel controls act-controls" data-side="left">
+        <h2 id="act-heading">Left multiply by</h2>
+        <fieldset class="side-options action-modes">
+          <legend class="cayley-section-title">Action</legend>
+          <label class="radio-row">
+            <input type="radio" name="action-side" value="left" checked />
+            <span class="radio-formula">gx</span>
+          </label>
+          <label class="radio-row">
+            <input type="radio" name="action-side" value="right" />
+            <span class="radio-formula">xg</span>
+          </label>
+          <label class="radio-row">
+            <input type="radio" name="action-side" value="conjugate" />
+            <span class="radio-formula">gxg<sup>&minus;1</sup></span>
+          </label>
+        </fieldset>
+        <div id="act-buttons" class="button-list"></div>
+        <p id="act-note" class="cayley-helper"></p>
       </aside>
 
       <section class="panel visual-panel">
@@ -677,6 +707,9 @@
               <marker id="arrowhead-right" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#9b4d2a" />
               </marker>
+              <marker id="arrowhead-conjugate" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#6d3fa3" />
+              </marker>
             </defs>
 
             <g id="cayley-layer" aria-hidden="true"></g>
@@ -687,11 +720,6 @@
 
         <div id="legend" class="legend"></div>
       </section>
-
-      <aside class="panel controls right-controls">
-        <h2>Right multiply by</h2>
-        <div id="right-buttons" class="button-list"></div>
-      </aside>
 
       <aside id="cayley-controls" class="panel controls cayley-controls">
         <h2>Cayley graph</h2>
@@ -722,6 +750,8 @@
         aria-label="Show left multiplication controls">Left</button>
       <button type="button" class="dock-tab" data-dock="right" aria-pressed="false"
         aria-label="Show right multiplication controls">Right</button>
+      <button type="button" class="dock-tab" data-dock="conjugate" aria-pressed="false"
+        aria-label="Show conjugation controls">Conj</button>
       <button type="button" class="dock-tab" data-dock="cayley" aria-pressed="false"
         aria-label="Show Cayley graph controls">Cayley</button>
     </nav>
@@ -1075,26 +1105,59 @@
       return new Map(group.slotOrder.map((elementId, index) => [elementId, group.slotPositions[index]]));
     }
 
-    function applyOperationWith(group, operation, elementId) {
-      return operation.side === "left"
-        ? group.multiply(operation.elementId, elementId)
-        : group.multiply(elementId, operation.elementId);
-    }
-
-    // An involution is exactly the case where every arrow has its reverse in
-    // the same picture, since x → xg and xg → x both appear only when g² = e.
-    function isInvolution(group, elementId) {
-      return elementId !== group.identityId
-        && group.multiply(elementId, elementId) === group.identityId;
-    }
-
-    function elementOrderIn(group, elementId) {
-      let product = group.identityId;
-      for (let n = 1; n <= group.elements.length; n += 1) {
-        product = group.multiply(product, elementId);
-        if (product === group.identityId) return n;
+    function inverseIn(group, elementId) {
+      for (const element of group.elements) {
+        if (group.multiply(elementId, element.id) === group.identityId) return element.id;
       }
-      throw new Error(`Could not determine order of ${elementId}`);
+      throw new Error(`No inverse for ${elementId}`);
+    }
+
+    function isAbelianGroup(group) {
+      return group.elements.every((a) =>
+        group.elements.every((b) => group.multiply(a.id, b.id) === group.multiply(b.id, a.id)));
+    }
+
+    // Conjugation is the composite L_g ∘ R_{g⁻¹}, which is why it needs no
+    // state of its own: the running "x ↦ a x b" readout already covers it.
+    function applyOperationWith(group, operation, elementId) {
+      if (operation.side === "left") return group.multiply(operation.elementId, elementId);
+      if (operation.side === "right") return group.multiply(elementId, operation.elementId);
+      return group.multiply(
+        group.multiply(operation.elementId, elementId),
+        inverseIn(group, operation.elementId)
+      );
+    }
+
+    /** The permutation an operation performs, as a function on element ids. */
+    function operationStep(group, operation) {
+      return (elementId) => applyOperationWith(group, operation, elementId);
+    }
+
+    /** Orbits of a permutation of the group's elements, each listed in the
+     *  order the permutation visits them. */
+    function permutationCycles(group, step) {
+      const cycles = [];
+      const visited = new Set();
+      for (const element of group.elements) {
+        if (visited.has(element.id)) continue;
+        const cycle = [];
+        let current = element.id;
+        while (!visited.has(current)) {
+          visited.add(current);
+          cycle.push(current);
+          current = step(current);
+        }
+        cycles.push(cycle);
+      }
+      return cycles;
+    }
+
+    // Whether the rounded four-cycle animation applies. Asking the permutation
+    // rather than the order of the element matters once conjugation is in play:
+    // conjugation always fixes the identity and the whole centre, so it never
+    // decomposes into four-cycles however high the order of the element.
+    function isFourCyclePermutation(group, step) {
+      return permutationCycles(group, step).every((cycle) => cycle.length === 4);
     }
 
     function animationDurationMs(prefersReducedMotion) {
@@ -1122,18 +1185,9 @@
     // dots travel along a rounded circuit instead of cutting straight across.
     function buildFourCycleSegments(group, slotPositions, operation) {
       const segments = new Map();
-      const visited = new Set();
-      for (const element of group.elements) {
-        if (visited.has(element.id)) continue;
-        const cycle = [];
-        let current = element.id;
-        while (!visited.has(current)) {
-          visited.add(current);
-          cycle.push(current);
-          current = applyOperationWith(group, operation, current);
-        }
-        if (cycle.length !== 4 || current !== cycle[0]) {
-          throw new Error("An order-four multiplication did not decompose into four-cycles.");
+      for (const cycle of permutationCycles(group, operationStep(group, operation))) {
+        if (cycle.length !== 4) {
+          throw new Error("This operation did not decompose into four-cycles.");
         }
         const points = cycle.map((id) => slotPositions.get(id));
         for (let index = 0; index < 4; index += 1) {
@@ -1276,44 +1330,36 @@
     function previewArrows(group, liveCoordinates, imageMap, pendingOperations, operation) {
       const projected = projectImages(group, imageMap, pendingOperations);
       const labelByImage = new Map([...projected].map(([labelId, image]) => [image, labelId]));
-      const paired = isInvolution(group, operation.elementId);
       const step = (labelId) =>
         labelByImage.get(applyOperationWith(group, operation, projected.get(labelId)));
       const centers = cycleCenters(group, liveCoordinates, step);
-      return group.elements.map((label) => {
-        const targetId = step(label.id);
-        return {
-          id: label.id,
-          targetId,
-          from: liveCoordinates.get(label.id),
-          to: liveCoordinates.get(targetId),
-          loop: targetId === label.id,
-          paired,
-          center: centers.get(label.id)
-        };
-      });
+      return group.elements.map((label) => buildArrow(group, liveCoordinates, step, centers, label.id));
+    }
+
+    // One arrow of an overlay. `paired` is asked of the individual orbit rather
+    // than of the whole operation, because conjugation mixes fixed points,
+    // swapped pairs and longer cycles in a single picture.
+    function buildArrow(group, liveCoordinates, step, centers, sourceId) {
+      const targetId = step(sourceId);
+      return {
+        id: sourceId,
+        targetId,
+        from: liveCoordinates.get(sourceId),
+        to: liveCoordinates.get(targetId),
+        loop: targetId === sourceId,
+        paired: targetId !== sourceId && step(targetId) === sourceId,
+        center: centers.get(sourceId)
+      };
     }
 
     // Cayley arrows join labelled dots, so they deform with the dots during an
     // animation rather than disappearing.
     function cayleyArrows(group, liveCoordinates, generatorId, side) {
-      const paired = isInvolution(group, generatorId);
       const step = (elementId) => side === "left"
         ? group.multiply(generatorId, elementId)
         : group.multiply(elementId, generatorId);
       const centers = cycleCenters(group, liveCoordinates, step);
-      return group.elements.map((source) => {
-        const targetId = step(source.id);
-        return {
-          id: source.id,
-          targetId,
-          from: liveCoordinates.get(source.id),
-          to: liveCoordinates.get(targetId),
-          loop: targetId === source.id,
-          paired,
-          center: centers.get(source.id)
-        };
-      });
+      return group.elements.map((source) => buildArrow(group, liveCoordinates, step, centers, source.id));
     }
 
     /* core:end */
@@ -1327,8 +1373,11 @@
     const workspace = document.getElementById("workspace");
     const pageTitle = document.getElementById("page-title");
     const groupSelect = document.getElementById("group-select");
-    const leftButtons = document.getElementById("left-buttons");
-    const rightButtons = document.getElementById("right-buttons");
+    const actControls = document.getElementById("act-controls");
+    const actHeading = document.getElementById("act-heading");
+    const actButtons = document.getElementById("act-buttons");
+    const actNote = document.getElementById("act-note");
+    const actionSideInputs = [...document.querySelectorAll('input[name="action-side"]')];
     const generatorButtons = document.getElementById("generator-buttons");
     const transformationReadout = document.getElementById("transformation");
     const statusReadout = document.getElementById("status");
@@ -1361,6 +1410,7 @@
     let netLeft = group.identityId;
     let netRight = group.identityId;
     let hoveredOperation = null;
+    let actionSide = "left";
     let previewNodes = [];
     let cayleyBundles = [];
     let finishActiveAnimation = null;
@@ -1444,27 +1494,54 @@
       }
     }
 
-    function rebuildMultiplicationButtons() {
-      leftButtons.replaceChildren();
-      rightButtons.replaceChildren();
-      createButtons(leftButtons, "left");
-      createButtons(rightButtons, "right");
-    }
+    const ACTION_HEADINGS = {
+      left: "Left multiply by",
+      right: "Right multiply by",
+      conjugate: "Conjugate by"
+    };
 
-    function createButtons(container, side) {
+    // One set of buttons for all three actions. The side is read when the
+    // button is used rather than baked in, so switching action does not have
+    // to rebuild them.
+    function rebuildMultiplicationButtons() {
+      actButtons.replaceChildren();
       for (const element of elements) {
         const button = document.createElement("button");
         button.type = "button";
         button.innerHTML = element.html;
-        button.setAttribute("aria-label", `${side === "left" ? "Left" : "Right"} multiply by ${element.plain}`);
-        const operation = { side, elementId: element.id };
-        button.addEventListener("mouseenter", () => setHoveredOperation(operation));
+        button.dataset.elementId = element.id;
+        const operation = () => ({ side: actionSide, elementId: element.id });
+        button.addEventListener("mouseenter", () => setHoveredOperation(operation()));
         button.addEventListener("mouseleave", () => setHoveredOperation(null));
-        button.addEventListener("focus", () => setHoveredOperation(operation));
+        button.addEventListener("focus", () => setHoveredOperation(operation()));
         button.addEventListener("blur", () => setHoveredOperation(null));
-        button.addEventListener("click", () => enqueueOperation(operation));
-        container.appendChild(button);
+        button.addEventListener("click", () => enqueueOperation(operation()));
+        actButtons.appendChild(button);
       }
+      updateActionLabels();
+    }
+
+    function updateActionLabels() {
+      actControls.dataset.side = actionSide;
+      actHeading.textContent = ACTION_HEADINGS[actionSide];
+      for (const button of actButtons.children) {
+        const element = elementById.get(button.dataset.elementId);
+        button.setAttribute("aria-label",
+          `${ACTION_HEADINGS[actionSide]} ${element.plain}`.replace(/^(\w)/, (c) => c.toLowerCase()));
+      }
+      // Conjugation is the identity map in an abelian group. Saying so turns
+      // eight buttons that visibly do nothing from a bug into the point.
+      actNote.textContent = actionSide === "conjugate" && isAbelianGroup(group)
+        ? "Every conjugation here is the identity map: this group is abelian."
+        : "";
+    }
+
+    function setActionSide(side) {
+      if (actionSide === side) return;
+      actionSide = side;
+      actionSideInputs.forEach((input) => { input.checked = input.value === side; });
+      updateActionLabels();
+      if (hoveredOperation) setHoveredOperation({ side, elementId: hoveredOperation.elementId });
     }
 
     function rebuildGeneratorButtons() {
@@ -1508,6 +1585,7 @@
       }
       updateGeneratorButtonStates();
       updateCayleySummary();
+      updateActionLabels();
       renderTransformation();
       updateStatus();
       rebuildOverlays();
@@ -1563,8 +1641,13 @@
     function updateNetTransformation(operation) {
       if (operation.side === "left") {
         netLeft = group.multiply(operation.elementId, netLeft);
-      } else {
+      } else if (operation.side === "right") {
         netRight = group.multiply(netRight, operation.elementId);
+      } else {
+        // Conjugation is L_g followed by R_{g⁻¹}, so it needs no state beyond
+        // the two halves already being tracked.
+        netLeft = group.multiply(operation.elementId, netLeft);
+        netRight = group.multiply(netRight, inverseIn(group, operation.elementId));
       }
       renderTransformation();
     }
@@ -1574,19 +1657,40 @@
         transformationReadout.innerHTML = "x &mapsto; x";
         return;
       }
+      // Signed labels such as −k need brackets or "−kx−k⁻¹" is unreadable.
+      const bracketed = (elementId) => {
+        const element = elementById.get(elementId);
+        return element.plain.startsWith("−") || element.plain.startsWith("-")
+          ? `(${element.html})`
+          : element.html;
+      };
       const leftText = netLeft === group.identityId ? "" : elementById.get(netLeft).html;
-      let rightText = "";
-      if (netRight !== group.identityId) {
-        const rightElement = elementById.get(netRight);
-        rightText = rightElement.plain.startsWith("−") || rightElement.plain.startsWith("-")
-          ? `(${rightElement.html})`
-          : rightElement.html;
+      // A net map that happens to be a conjugation reads far better as gxg⁻¹
+      // than as the literal right factor, which for D8's r would be r³.
+      if (netLeft !== group.identityId && netRight === inverseIn(group, netLeft)) {
+        const factor = bracketed(netLeft);
+        transformationReadout.innerHTML = `x &mapsto; ${factor}x${factor}<sup>&minus;1</sup>`;
+        return;
       }
+      const rightText = netRight === group.identityId ? "" : bracketed(netRight);
       transformationReadout.innerHTML = `x &mapsto; ${leftText}x${rightText}`;
     }
 
+    // Kept in step with --left, --right and --conj in the stylesheet.
+    const ACTION_COLORS = {
+      left: "#315fbd",
+      right: "#9b4d2a",
+      conjugate: "#6d3fa3"
+    };
+
+    const ACTION_VERBS = {
+      left: "left multiply by",
+      right: "right multiply by",
+      conjugate: "conjugate by"
+    };
+
     function operationDescription(operation) {
-      return `${operation.side === "left" ? "left" : "right"} multiply by ${elementById.get(operation.elementId).plain}`;
+      return `${ACTION_VERBS[operation.side]} ${elementById.get(operation.elementId).plain}`;
     }
 
     function updateStatus() {
@@ -1635,7 +1739,8 @@
         destinationCoordinates.set(label.id, positions.get(destinationImage));
       }
 
-      const useFourCycleAnimation = elementOrderIn(group, activeOperation.elementId) === 4;
+      const useFourCycleAnimation =
+        isFourCyclePermutation(group, operationStep(group, activeOperation));
       const fourCycleSegments = useFourCycleAnimation
         ? buildFourCycleSegments(group, positions, activeOperation)
         : null;
@@ -1773,8 +1878,8 @@
       previewLayer.replaceChildren();
       previewNodes = [];
       if (!hoveredOperation) return;
-      const stroke = hoveredOperation.side === "left" ? "#315fbd" : "#9b4d2a";
-      const marker = hoveredOperation.side === "left" ? "url(#arrowhead-left)" : "url(#arrowhead-right)";
+      const stroke = ACTION_COLORS[hoveredOperation.side];
+      const marker = `url(#arrowhead-${hoveredOperation.side})`;
       for (let index = 0; index < elements.length; index += 1) {
         const node = createSvgElement("path", { class: "preview-arrow", stroke, "marker-end": marker });
         previewLayer.appendChild(node);
@@ -1837,7 +1942,8 @@
     // selecting the Cayley tab has to switch the graph on as well — otherwise
     // the tab would open a panel whose controls do nothing.
     function setDockPanel(name) {
-      workspace.dataset.dock = name;
+      workspace.dataset.dock = name === "cayley" ? "cayley" : "act";
+      if (name !== "cayley") setActionSide(name);
       for (const tab of dockTabs) {
         tab.setAttribute("aria-pressed", String(tab.dataset.dock === name));
       }
@@ -1849,6 +1955,12 @@
     }
 
     dockTabs.forEach((tab) => tab.addEventListener("click", () => setDockPanel(tab.dataset.dock)));
+    actionSideInputs.forEach((input) => input.addEventListener("change", () => {
+      setActionSide(input.value);
+      for (const tab of dockTabs) {
+        tab.setAttribute("aria-pressed", String(tab.dataset.dock === input.value));
+      }
+    }));
 
     groupSelect.addEventListener("change", () => setGroup(groupSelect.value));
     resetButton.addEventListener("click", resetAction);

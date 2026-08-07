@@ -6,7 +6,7 @@ import {
   centerOf, generatedBy, inverseOf, cubeEdgeSet, cayleyEdgeSet, sameSet
 } from "./core.mjs";
 
-const { slotPositionsFor, elementOrderIn } = core;
+const { slotPositionsFor } = core;
 
 test("all five groups of order 8 are present", () => {
   assert.deepEqual(groupKeys.sort(), ["C2xC2xC2", "C4xC2", "C8", "D8", "Q8"]);
@@ -62,12 +62,6 @@ for (const key of groupKeys) {
     for (const a of ids) {
       assert.equal(new Set(ids.map((b) => group.multiply(a, b))).size, 8, `row ${a} repeats`);
       assert.equal(new Set(ids.map((b) => group.multiply(b, a))).size, 8, `column ${a} repeats`);
-    }
-  });
-
-  test(`${key}: elementOrderIn agrees with brute force`, () => {
-    for (const a of ids) {
-      assert.equal(elementOrderIn(group, a), bruteForceOrder(group, a), `order of ${a}`);
     }
   });
 
@@ -217,4 +211,87 @@ test("mod normalises negative values", () => {
   assert.equal(core.mod(-5, 4), 3);
   assert.equal(core.mod(9, 4), 1);
   assert.equal(core.mod(0, 4), 0);
+});
+
+test("conjugation is the composite of a left and a right multiplication", () => {
+  // This is why it needs no state of its own: the running x -> a x b readout
+  // already covers it.
+  for (const key of groupKeys) {
+    const group = groups[key];
+    for (const g of idsOf(group)) {
+      const inverse = core.inverseIn(group, g);
+      for (const x of idsOf(group)) {
+        assert.equal(
+          core.applyOperationWith(group, { side: "conjugate", elementId: g }, x),
+          group.multiply(group.multiply(g, x), inverse),
+          `${key}: conjugating ${x} by ${g}`
+        );
+      }
+    }
+  }
+});
+
+test("conjugation acts by automorphisms, unlike either multiplication", () => {
+  for (const key of groupKeys) {
+    const group = groups[key];
+    for (const g of idsOf(group)) {
+      const conj = (x) => core.applyOperationWith(group, { side: "conjugate", elementId: g }, x);
+      assert.equal(conj(group.identityId), group.identityId, `${key}: ${g} moved the identity`);
+      for (const x of idsOf(group)) {
+        for (const y of idsOf(group)) {
+          assert.equal(conj(group.multiply(x, y)), group.multiply(conj(x), conj(y)));
+        }
+      }
+    }
+  }
+});
+
+test("conjugation is trivial exactly in the abelian groups", () => {
+  const trivial = groupKeys.filter((key) => {
+    const group = groups[key];
+    return idsOf(group).every((g) => idsOf(group).every((x) =>
+      core.applyOperationWith(group, { side: "conjugate", elementId: g }, x) === x));
+  });
+  assert.deepEqual(trivial.sort(), ["C2xC2xC2", "C4xC2", "C8"]);
+  for (const key of groupKeys) {
+    assert.equal(core.isAbelianGroup(groups[key]), trivial.includes(key), key);
+  }
+});
+
+test("conjugation never decomposes into four-cycles", () => {
+  // It always fixes the identity and the whole centre, so the rounded
+  // four-cycle animation must not fire for it however high the order of g.
+  for (const key of groupKeys) {
+    const group = groups[key];
+    for (const g of idsOf(group)) {
+      const step = core.operationStep(group, { side: "conjugate", elementId: g });
+      assert.equal(core.isFourCyclePermutation(group, step), false, `${key}: conjugation by ${g}`);
+      assert.ok(core.permutationCycles(group, step).some((c) => c.length === 1),
+        `${key}: conjugation by ${g} should fix something`);
+    }
+  }
+});
+
+test("conjugations coincide exactly when the elements differ by a central one", () => {
+  for (const key of ["D8", "Q8"]) {
+    const group = groups[key];
+    const distinct = new Set(idsOf(group).map((g) =>
+      idsOf(group).map((x) =>
+        core.applyOperationWith(group, { side: "conjugate", elementId: g }, x)).join(",")));
+    // |G / Z(G)| distinct inner automorphisms, so the eight buttons give four maps.
+    assert.equal(distinct.size, 8 / centerOf(group).length, key);
+  }
+});
+
+test("the four-cycle animation still fires for plain multiplication", () => {
+  for (const key of groupKeys) {
+    const group = groups[key];
+    for (const side of ["left", "right"]) {
+      for (const g of idsOf(group)) {
+        const step = core.operationStep(group, { side, elementId: g });
+        assert.equal(core.isFourCyclePermutation(group, step), bruteForceOrder(group, g) === 4,
+          `${key}: ${side} by ${g}`);
+      }
+    }
+  }
 });

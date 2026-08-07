@@ -10,7 +10,7 @@ const {
   ANIMATION_DURATION_MS, DOT_RADIUS, slotPositionsFor, applyOperationWith,
   animationDurationMs, easeInOutCubic, distance, buildFourCycleSegments, cubicPoint,
   arrowPathBetween, loopPathAt, pathForArrow, projectImages, previewArrows,
-  cayleyArrows, isInvolution
+  cayleyArrows
 } = core;
 
 const identityImages = (group) => new Map(idsOf(group).map((id) => [id, id]));
@@ -163,8 +163,9 @@ for (const key of groupKeys) {
     // rounded circuit.
     for (const side of ["left", "right"]) {
       for (const generatorId of ids) {
-        if (generatorId === group.identityId || isInvolution(group, generatorId)) continue;
+        if (generatorId === group.identityId) continue;
         for (const arrow of cayleyArrows(group, positions, generatorId, side)) {
+          if (arrow.paired || arrow.loop) continue;
           const { control, middle } = quadraticPoints(pathForArrow(arrow, group.visualCenter));
           assert.ok(
             hypot(control, arrow.center) >= hypot(middle, arrow.center) - PATH_PRECISION,
@@ -182,10 +183,11 @@ for (const key of groupKeys) {
     let checked = 0;
     for (const side of ["left", "right"]) {
       for (const generatorId of ids) {
-        if (generatorId === group.identityId || isInvolution(group, generatorId)) continue;
+        if (generatorId === group.identityId) continue;
         const arrows = cayleyArrows(group, positions, generatorId, side);
         const byId = new Map(arrows.map((arrow) => [arrow.id, arrow]));
         for (const circuit of circuitsOf(arrows)) {
+          if (circuit.length < 3) continue;
           if (!isConvexCircuit(circuit, (id) => positions.get(id))) continue;
           for (const id of circuit) {
             const arrow = byId.get(id);
@@ -209,15 +211,15 @@ for (const key of groupKeys) {
   test(`${key}: mutually paired arrows stay visibly apart`, () => {
     for (const side of ["left", "right"]) {
       for (const generatorId of ids) {
-        if (!isInvolution(group, generatorId)) continue;
         const byPair = new Map();
         for (const arrow of cayleyArrows(group, positions, generatorId, side)) {
+          if (!arrow.paired) continue;
           byPair.set(`${arrow.id}->${arrow.targetId}`, quadraticPoints(pathForArrow(arrow, group.visualCenter)));
         }
         for (const [pairKey, forward] of byPair) {
           const [from, to] = pairKey.split("->");
           const backward = byPair.get(`${to}->${from}`);
-          assert.ok(backward, `${generatorId} is an involution but ${to} → ${from} is missing`);
+          assert.ok(backward, `${to} → ${from} is missing from a paired orbit`);
           assert.ok(hypot(forward.control, backward.control) > 20,
             `${side} ${generatorId}: ${pairKey} overlaps its reverse`);
         }

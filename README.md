@@ -9,7 +9,14 @@ covers all five groups of order 8:
 - dihedral group `D8`
 - quaternion group `Q8`
 
-The app supports left and right multiplication previews, queued multiplication animations, net-transform tracking, and configurable left/right Cayley graph overlays.
+The app acts on the group by left multiplication, right multiplication or
+conjugation, with previews, queued animations, net-transformation tracking,
+and configurable left/right Cayley graph overlays.
+
+Conjugation needs no machinery of its own: it is the composite `L_g` then
+`R_{g inverse}`, so the running `x -> a x b` readout already covers it. It is
+the identity map in the three abelian groups, and the app says so rather than
+leaving eight buttons that silently do nothing.
 
 `D8` here denotes the dihedral group of **order 8** (the symmetries of a square), which some authors write as `D4`.
 
