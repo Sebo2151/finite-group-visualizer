@@ -72,6 +72,19 @@ test("the first colour slots stay apart for red-green colour blindness", () => {
   }
 });
 
+test("the status line reserves its height so the figure cannot shift", () => {
+  // A status naming a live operation wraps to a second line where "Ready"
+  // does not; without a reserved height that pushed the figure down every
+  // time an animation started.
+  const block = html.match(/#status \{[^}]*\}/);
+  assert.ok(block, "#status rule is missing");
+  assert.match(block[0], /min-height:\s*2\.6em/);
+  assert.match(block[0], /line-clamp:\s*2/);
+  // The message has to stay short enough to fit those two lines on a narrow
+  // phone, so the running state must not regain a prefix.
+  assert.ok(!html.includes("Performing:"), "the status prefix is back");
+});
+
 test("muted body text clears WCAG AA", () => {
   const match = html.match(/--muted:\s*(#[0-9a-fA-F]{6})/);
   assert.ok(match, "--muted is not defined");
