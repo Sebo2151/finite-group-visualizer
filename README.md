@@ -1,6 +1,7 @@
-# Groups of Order 8 Visualizer
+# Finite Group Visualizer
 
-An interactive, browser-based visualization of all five groups of order 8:
+An interactive, browser-based visualization of finite groups. It currently
+covers all five groups of order 8:
 
 - cyclic group `C8`
 - direct product `C4 × C2`
@@ -47,7 +48,7 @@ colour contrast and attribution.
 
 ## Publish with GitHub Pages
 
-1. Create a new GitHub repository, for example `groups-of-order-8-visualizer`.
+1. Create a new GitHub repository, for example `finite-group-visualizer`.
 2. Put the contents of this folder at the repository root and push them to the `main` branch.
 3. On GitHub, open **Settings → Pages**.
 4. Under **Build and deployment**, choose **Deploy from a branch**.
@@ -56,7 +57,7 @@ colour contrast and attribution.
 GitHub will publish the site at a project URL of the form:
 
 ```text
-https://YOUR-USERNAME.github.io/groups-of-order-8-visualizer/
+https://YOUR-USERNAME.github.io/finite-group-visualizer/
 ```
 
 Official documentation: https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site

@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="author" content="Sebastian Bozlee" />
-  <meta name="description" content="Interactive visualization of all five groups of order 8: left and right multiplication, net transformations, and Cayley graphs." />
-  <title>Groups of Order 8 Visualizer</title>
+  <meta name="description" content="Interactive visualization of finite groups: left and right multiplication, net transformations, and Cayley graphs. Currently covers all five groups of order 8." />
+  <title>Finite Group Visualizer</title>
   <style>
     :root {
       --page-bg: #f5f7fb;
@@ -522,7 +522,7 @@
       <h1 id="page-title">The dihedral group D<sub>8</sub></h1>
       <p class="subtitle">Hover to preview a permutation; click to queue a multiplication.</p>
       <div class="group-picker">
-        <label for="group-select">Group of order 8</label>
+        <label for="group-select">Group</label>
         <select id="group-select">
           <option value="C8">C₈ — cyclic group</option>
           <option value="C4xC2">C₄ × C₂</option>
@@ -1270,7 +1270,7 @@
       positions = slotPositionsFor(group);
 
       pageTitle.innerHTML = group.titleHTML;
-      document.title = `${group.titlePlain} — Groups of Order 8 Visualizer`;
+      document.title = `${group.titlePlain} — Finite Group Visualizer`;
       workspace.setAttribute("aria-label", `${group.titlePlain} multiplication visualizer`);
       visualization.setAttribute(
         "aria-label",
