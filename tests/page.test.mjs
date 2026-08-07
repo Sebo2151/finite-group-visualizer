@@ -41,6 +41,37 @@ test("each generator gets its own dash pattern as well as its own colour", () =>
   }
 });
 
+test("colour slots are handed out by selection order, not by element", () => {
+  const { nextCayleySlot } = core;
+  // First two generators always take the first two colours, whichever
+  // elements they happen to be.
+  assert.equal(nextCayleySlot(new Set()), 0);
+  assert.equal(nextCayleySlot(new Set([0])), 1);
+  assert.equal(nextCayleySlot(new Set([0, 1])), 2);
+  // A freed slot is reused, so the surviving generators keep their colours.
+  assert.equal(nextCayleySlot(new Set([0, 2])), 1);
+  assert.equal(nextCayleySlot(new Set([1, 2])), 0);
+  // Never runs off the end of the palette.
+  const full = new Set(core.cayleyColors.map((_, i) => i));
+  assert.equal(nextCayleySlot(full), core.cayleyColors.length - 1);
+});
+
+test("the first colour slots stay apart for red-green colour blindness", () => {
+  // Two or three generators is the common case, so the earliest slots carry
+  // the most weight. Simulated deuteranopia must keep them separable.
+  const deuteranope = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((o) => parseInt(hex.slice(o, o + 2), 16));
+    return [0.625 * r + 0.375 * g, 0.7 * r + 0.3 * g, 0.3 * g + 0.7 * b];
+  };
+  const first = core.cayleyColors.slice(0, 3).map(deuteranope);
+  for (let i = 0; i < first.length; i += 1) {
+    for (let j = i + 1; j < first.length; j += 1) {
+      const gap = Math.hypot(...first[i].map((v, k) => v - first[j][k]));
+      assert.ok(gap > 100, `slots ${i} and ${j} are only ${gap.toFixed(0)} apart`);
+    }
+  }
+});
+
 test("muted body text clears WCAG AA", () => {
   const match = html.match(/--muted:\s*(#[0-9a-fA-F]{6})/);
   assert.ok(match, "--muted is not defined");

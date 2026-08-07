@@ -104,7 +104,7 @@ const exported = [
   "octagonSlotPositions", "octagonCenter",
   "quaternionSlotPositions", "quaternionCenter",
   "cayleyColors", "cayleyDashes", "mod", "buildGroups",
-  "slotPositionsFor", "applyOperationWith", "elementOrderIn", "isInvolution", "animationDurationMs",
+  "nextCayleySlot", "slotPositionsFor", "applyOperationWith", "elementOrderIn", "isInvolution", "animationDurationMs",
   "easeInOutCubic", "distance", "cubicPoint", "buildFourCycleSegments",
   "arrowPathBetween", "loopPathAt", "pathForArrow", "projectImages",
   "previewArrows", "cayleyArrows"

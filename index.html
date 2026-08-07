@@ -636,6 +636,7 @@
     const LOOP_SPREAD = 13;
     const LOOP_REACH = 47;
     const LOOP_FLARE = 24;
+    const UNASSIGNED_SWATCH_COLOR = "#8b93a3";
 
     const VIEW_WIDTH = 720;
     const VIEW_HEIGHT = 500;
@@ -721,11 +722,15 @@
       quaternionRingPoint(240)
     ];
 
-    // Every colour clears 4.5:1 against white, so the arrows stay legible at
-    // the 0.82 stroke opacity used in the stylesheet.
+    // Handed out in order of selection rather than by element, so the first
+    // generator on screen is always the first colour here and the second
+    // always the second. Ordered so the earliest slots stay far apart under
+    // red-green colour blindness too, since two or three generators is the
+    // common case. Every colour clears 4.5:1 against white, so the arrows stay
+    // legible at the 0.82 stroke opacity used in the stylesheet.
     const cayleyColors = [
-      "#1d4ed8", "#b91c1c", "#047857", "#7e22ce",
-      "#c2410c", "#0e7490", "#9f1239", "#4d7c0f"
+      "#1d4ed8", "#c2410c", "#166534", "#7e22ce",
+      "#b91c1c", "#0e7490", "#9f1239", "#4d7c0f"
     ];
 
     // Paired with the colours so the generators stay distinguishable without
@@ -734,6 +739,16 @@
       "", "10 6", "2 6", "16 5 2 5",
       "6 5", "1 5", "14 4 2 4 2 4", "22 7"
     ];
+
+    // Colour slots are held for as long as a generator stays selected, so
+    // deselecting one never recolours the others; a freed slot is reused by
+    // whichever generator is picked next.
+    function nextCayleySlot(usedSlots) {
+      for (let slot = 0; slot < cayleyColors.length; slot += 1) {
+        if (!usedSlots.has(slot)) return slot;
+      }
+      return cayleyColors.length - 1;
+    }
 
     function mod(value, modulus) {
       return ((value % modulus) + modulus) % modulus;
@@ -1219,6 +1234,7 @@
     const generatorButtonNodes = new Map();
     const queue = [];
     const selectedCayleyElements = new Set();
+    const cayleySlotByElement = new Map();
     const imageByLabel = new Map();
     const currentCoordinates = new Map();
 
@@ -1337,29 +1353,28 @@
     function rebuildGeneratorButtons() {
       generatorButtons.replaceChildren();
       generatorButtonNodes.clear();
-      elements.forEach((element, index) => {
+      for (const element of elements) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "generator-toggle";
         button.setAttribute("aria-pressed", "false");
         button.setAttribute("aria-label", `Toggle Cayley arrows for ${element.plain}`);
-        button.style.setProperty("--generator-color", cayleyColors[index]);
-        const dash = cayleyDashes[index];
         button.innerHTML =
           `<span>${element.html}</span>` +
           `<svg class="generator-swatch" viewBox="0 0 34 10" aria-hidden="true">` +
           `<line x1="2" y1="5" x2="32" y2="5" stroke="var(--generator-color)" stroke-width="3.2"` +
-          ` stroke-linecap="round"${dash ? ` stroke-dasharray="${dash}"` : ""} /></svg>`;
+          ` stroke-linecap="round" /></svg>`;
         button.addEventListener("click", () => toggleCayleyElement(element.id));
         generatorButtons.appendChild(button);
-        generatorButtonNodes.set(element.id, button);
-      });
+        generatorButtonNodes.set(element.id, { button, swatch: button.querySelector("line") });
+      }
     }
 
     function resetAllControlsForGroup() {
       queue.length = 0;
       selectedCayleyElements.clear();
-      for (const elementId of group.defaultGenerators) selectedCayleyElements.add(elementId);
+      cayleySlotByElement.clear();
+      for (const elementId of group.defaultGenerators) selectCayleyElement(elementId);
       isAnimating = false;
       activeOperation = null;
       hoveredOperation = null;
@@ -1563,9 +1578,19 @@
       rebuildPreviewLayer();
     }
 
+    function selectCayleyElement(elementId) {
+      if (selectedCayleyElements.has(elementId)) return;
+      selectedCayleyElements.add(elementId);
+      cayleySlotByElement.set(elementId, nextCayleySlot(new Set(cayleySlotByElement.values())));
+    }
+
     function toggleCayleyElement(elementId) {
-      if (selectedCayleyElements.has(elementId)) selectedCayleyElements.delete(elementId);
-      else selectedCayleyElements.add(elementId);
+      if (selectedCayleyElements.has(elementId)) {
+        selectedCayleyElements.delete(elementId);
+        cayleySlotByElement.delete(elementId);
+      } else {
+        selectCayleyElement(elementId);
+      }
       updateGeneratorButtonStates();
       updateCayleySummary();
       rebuildCayleyLayer();
@@ -1573,9 +1598,23 @@
 
     function updateGeneratorButtonStates() {
       for (const element of elements) {
-        const button = generatorButtonNodes.get(element.id);
-        if (button) button.setAttribute("aria-pressed", String(selectedCayleyElements.has(element.id)));
+        const nodes = generatorButtonNodes.get(element.id);
+        if (!nodes) continue;
+        const slot = cayleySlotByElement.get(element.id);
+        const selected = slot !== undefined;
+        nodes.button.setAttribute("aria-pressed", String(selected));
+        nodes.button.style.setProperty("--generator-color",
+          selected ? cayleyColors[slot] : UNASSIGNED_SWATCH_COLOR);
+        nodes.swatch.setAttribute("stroke-dasharray",
+          selected && cayleyDashes[slot] ? cayleyDashes[slot] : "none");
       }
+    }
+
+    /** Selected generators, in the order their colours were handed out. */
+    function selectedCayleyGenerators() {
+      return [...selectedCayleyElements]
+        .map((id) => ({ id, slot: cayleySlotByElement.get(id) }))
+        .sort((a, b) => a.slot - b.slot);
     }
 
     function currentCayleySide() {
@@ -1583,12 +1622,13 @@
     }
 
     function updateCayleySummary() {
-      const selected = elements.filter((element) => selectedCayleyElements.has(element.id));
+      const selected = selectedCayleyGenerators();
       if (selected.length === 0) {
         cayleySummary.textContent = "No elements selected.";
         return;
       }
-      cayleySummary.innerHTML = `Selected: ${selected.map((element) => element.html).join(", ")}.`;
+      cayleySummary.innerHTML =
+        `Selected: ${selected.map(({ id }) => elementById.get(id).html).join(", ")}.`;
     }
 
     function rebuildOverlays() {
@@ -1627,8 +1667,7 @@
       cayleyBundles = [];
       if (!cayleyVisibleInput.checked) return;
       const side = currentCayleySide();
-      elements.forEach((element, colorIndex) => {
-        if (!selectedCayleyElements.has(element.id)) return;
+      selectedCayleyGenerators().forEach(({ id: generatorId, slot: colorIndex }) => {
         const dash = cayleyDashes[colorIndex];
         const nodes = elements.map(() => {
           const node = createSvgElement("path", {
@@ -1640,7 +1679,7 @@
           cayleyLayer.appendChild(node);
           return node;
         });
-        cayleyBundles.push({ generatorId: element.id, side, nodes });
+        cayleyBundles.push({ generatorId, side, nodes });
       });
       updateCayleyGeometry();
     }
